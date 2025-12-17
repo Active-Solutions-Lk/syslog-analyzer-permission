@@ -1,0 +1,103 @@
+>>  Step 1: Install Required Tools
+
+
+
+
+# Install bc (calculator for timing)
+sudo apt update
+sudo apt install bc -y
+
+mysql -u root
+
+
+
+
+
+>>  Step 2: Create Database User
+
+
+
+
+
+mysql -u root
+
+-- Create user
+CREATE USER 'ruser'@'localhost' IDENTIFIED BY 'ruser1@Analyzer';
+
+-- Grant privileges
+GRANT ALL PRIVILEGES ON analyzer.* TO 'ruser'@'localhost';
+GRANT ALL PRIVILEGES ON test_transfer.* TO 'ruser'@'localhost';
+
+FLUSH PRIVILEGES;
+
+-- Verify
+SHOW GRANTS FOR 'ruser'@'localhost';
+
+EXIT;
+
+
+
+
+>>  Step 3: Create Database and Table
+
+
+
+
+mysql -u ruser -p'ruser1@Analyzer'
+
+-- Create database
+CREATE DATABASE analyzer;
+
+USE analyzer;
+
+-- Create mirror table
+CREATE TABLE remote_logs (
+  id INT NOT NULL AUTO_INCREMENT,
+  received_at DATETIME,
+  hostname VARCHAR(255),
+  facility VARCHAR(50),
+  message TEXT,
+  port VARCHAR(50),
+  PRIMARY KEY (id),
+  KEY idx_received_at (received_at),
+  KEY idx_hostname (hostname)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Verify
+DESCRIBE remote_logs;
+
+EXIT;
+
+
+
+
+
+>>  Step 4: Test Remote Connection
+
+
+
+
+# Test connection to Collector
+mysql -h 142.91.101.142 -u Admin -p'Admin@collector1' syslog_db -e "SELECT COUNT(*) FROM remote_logs;"
+
+
+
+
+>> Step 5: Create Sync Scripts
+
+
+
+
+chmod +x incremental_transfer.sh
+
+chmod +x auto_sync.sh
+
+bash auto_sync.sh
+
+
+
+
+
+
+
+
