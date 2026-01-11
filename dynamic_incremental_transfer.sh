@@ -1,5 +1,19 @@
 #!/bin/bash
 
+# Create logs directory if it doesn't exist
+mkdir -p logs
+
+# Generate log file name with timestamp
+LOG_FILE="logs/dynamic_transfer_$(date +%Y%m%d_%H%M%S).log"
+
+# Redirect all output to the log file
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+echo "=========================================="
+echo "Dynamic Multi-Collector Incremental Sync"
+echo "Log File: $LOG_FILE"
+echo "=========================================="
+
 # Database Configuration
 LOCAL_USER="ruser"
 LOCAL_PASS="ruser1@Analyzer"
@@ -109,12 +123,8 @@ while IFS=$'\t' read -r COLLECTOR_ID COLLECTOR_NAME COLLECTOR_IP COLLECTOR_DOMAI
     START_TIME=$(date +%s.%N)
     
     # Method: Generate INSERT statements with collector_id and execute them
-    mysql -h $REMOTE_HOST \
-          -u $REMOTE_USER \
-          -p"$REMOTE_PASS" \
-          -N -B \
-          $REMOTE_DB << EOF | mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB 2>&1
-SELECT CONCAT(
+    # Using a more robust approach to avoid variable expansion issues
+    QUERY="SELECT CONCAT(
   'INSERT INTO $LOCAL_TABLE (collector_id, original_log_id, received_at, hostname, facility, message, port) VALUES (',
   '$COLLECTOR_ID', ',',
   id, ',',
@@ -126,8 +136,9 @@ SELECT CONCAT(
 ) FROM $REMOTE_TABLE 
 WHERE id > $LAST_LOCAL_ID 
 ORDER BY id 
-LIMIT $ROWS_TO_FETCH;
-EOF
+LIMIT $ROWS_TO_FETCH;"
+    
+    echo "$QUERY" | mysql -h $REMOTE_HOST -u $REMOTE_USER -p"$REMOTE_PASS" -N -B $REMOTE_DB | mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB 2>&1
     
     TRANSFER_EXIT=$?
     
@@ -197,21 +208,55 @@ EOF
     fi
     
     if [ -f "$php_message_parser" ]; then
+        # Also check for system_action_manager.php
+        if [ -f "/var/www/html/syslog-analyzer-permission/system_action_manager.php" ]; then
+            php_system_action_manager="/var/www/html/syslog-analyzer-permission/system_action_manager.php"
+        elif [ -f "/c/xampp/htdocs/analyzer/syslog-analyzer-permissions/system_action_manager.php" ]; then
+            php_system_action_manager="/c/xampp/htdocs/analyzer/syslog-analyzer-permissions/system_action_manager.php"
+        else
+            php_system_action_manager="system_action_manager.php"
+        fi
         # Create a temporary PHP script to process the new logs
         TEMP_PHP_SCRIPT=$(mktemp --suffix=.php)
-        cat > "$TEMP_PHP_SCRIPT" << EOF
+        cat > "$TEMP_PHP_SCRIPT" << 'EOF_PHP'
 <?php
-require_once '$php_message_parser';
-
-// Database connection
-try {
-    $pdo = new PDO("mysql:host=localhost;dbname=analyzer", "ruser", "ruser1@Analyzer");
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    die("Connection failed: " . $e->getMessage());
+// Include the standardized connection
+// Check for connection.php in various locations
+if (file_exists('/var/www/html/syslog-analyzer-permission/connection.php')) {
+    require_once '/var/www/html/syslog-analyzer-permission/connection.php';
+} elseif (file_exists('connection.php')) {
+    require_once 'connection.php';
+} else {
+    die("connection.php not found");
 }
 
-$parser = new MessageParser($pdo);
+// Update the system_action_manager path in message_parser
+// Create a temporary message parser that references the correct system_action_manager path
+if (file_exists('$php_message_parser')) {
+    // Load the original message parser but with the correct system action manager path
+    require_once '$php_message_parser';
+    
+    // Override the constructor to use the correct system action manager path
+    class CustomMessageParser extends MessageParser {
+        public function __construct($pdo) {
+            $this->pdo = $pdo;
+            $this->loadPatterns();
+            $this->loadFieldRules();
+            
+            // Initialize system action manager with correct path
+            if (file_exists('$php_system_action_manager')) {
+                require_once '$php_system_action_manager';
+            } else {
+                die("system_action_manager.php not found");
+            }
+            $this->systemActionManager = new SystemActionManager($pdo);
+        }
+    }
+    
+    $parser = new CustomMessageParser($pdo);
+} else {
+    die("message_parser.php not found");
+}
 
 // Get the collector ID and last local ID from command line args
 $collectorId = $argv[1];
@@ -239,7 +284,7 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
 }
 
 echo "Parsing completed. Processed: $processed, Successful: $successful\n";
-EOF
+EOF_PHP
         
         # Execute the temporary PHP script with collector ID and last local ID as parameters
         php "$TEMP_PHP_SCRIPT" "$COLLECTOR_ID" "$LAST_LOCAL_ID"
