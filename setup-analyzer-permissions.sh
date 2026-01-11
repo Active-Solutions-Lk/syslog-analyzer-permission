@@ -25,7 +25,7 @@ LOCAL_TABLE="log_mirror"
 LOCAL_USER="ruser"
 LOCAL_PASS="ruser1@Analyzer"
 
-BATCH_SIZE=5000
+BATCH_SIZE=100000
 
 ################################################################################
 # Functions

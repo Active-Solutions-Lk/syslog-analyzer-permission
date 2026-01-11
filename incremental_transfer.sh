@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Configuration
-REMOTE_HOST="142.91.101.142"
+# collector Configuration
+REMOTE_HOST="192.168.0.92"
 REMOTE_USER="Admin"
 REMOTE_PASS="Admin@collector1"
 REMOTE_DB="syslog_db"
@@ -9,10 +9,10 @@ REMOTE_TABLE="remote_logs"
 
 LOCAL_USER="ruser"
 LOCAL_PASS="ruser1@Analyzer"
-LOCAL_DB="test_transfer"
-LOCAL_TABLE="remote_logs"
+LOCAL_DB="analyzer"
+LOCAL_TABLE="log_mirror"
 
-BATCH_SIZE=5000  # Number of rows to fetch per sync
+BATCH_SIZE=5000
 
 echo "=========================================="
 echo "Incremental Database Sync"
@@ -77,26 +77,35 @@ echo ""
 # Start timing
 START_TIME=$(date +%s.%N)
 
-# Export new rows from remote database
-mysqldump -h $REMOTE_HOST \
-          -u $REMOTE_USER \
-          -p"$REMOTE_PASS" \
-          --single-transaction \
-          --skip-lock-tables \
-          $REMOTE_DB \
-          $REMOTE_TABLE \
-          --where="id > $LAST_LOCAL_ID ORDER BY id LIMIT $ROWS_TO_FETCH" \
-          --no-create-info \
-          --skip-comments 2>/dev/null \
-          | mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB 2>/dev/null
+# Method: Generate INSERT statements and execute them
+mysql -h $REMOTE_HOST \
+      -u $REMOTE_USER \
+      -p"$REMOTE_PASS" \
+      -N -B \
+      $REMOTE_DB << SQLEOF | mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB 2>&1
+SELECT CONCAT(
+  'INSERT INTO $LOCAL_TABLE (id, received_at, hostname, facility, message, port) VALUES (',
+  id, ',',
+  QUOTE(received_at), ',',
+  QUOTE(hostname), ',',
+  QUOTE(facility), ',',
+  QUOTE(message), ',',
+  QUOTE(port), ');'
+) FROM $REMOTE_TABLE 
+WHERE id > $LAST_LOCAL_ID 
+ORDER BY id 
+LIMIT $ROWS_TO_FETCH;
+SQLEOF
 
-if [ $? -ne 0 ]; then
-    echo "ERROR: Transfer failed"
-    exit 1
-fi
+TRANSFER_EXIT=$?
 
 # End timing
 END_TIME=$(date +%s.%N)
+
+if [ $TRANSFER_EXIT -ne 0 ]; then
+    echo "ERROR: Transfer failed with exit code $TRANSFER_EXIT"
+    exit 1
+fi
 
 # Calculate duration
 DURATION=$(echo "$END_TIME - $START_TIME" | bc)
@@ -142,6 +151,8 @@ TOTAL_REMOTE=$(mysql -h $REMOTE_HOST -u $REMOTE_USER -p"$REMOTE_PASS" $REMOTE_DB
 echo "Sync Status:"
 echo "  Local rows: $TOTAL_LOCAL"
 echo "  Remote rows: $TOTAL_REMOTE"
-SYNC_PERCENT=$(echo "scale=2; ($TOTAL_LOCAL * 100) / $TOTAL_REMOTE" | bc)
-echo "  Sync progress: $SYNC_PERCENT%"
+if [ $TOTAL_REMOTE -gt 0 ]; then
+    SYNC_PERCENT=$(echo "scale=2; ($TOTAL_LOCAL * 100) / $TOTAL_REMOTE" | bc)
+    echo "  Sync progress: $SYNC_PERCENT%"
+fi
 echo "=========================================="
