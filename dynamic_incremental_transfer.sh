@@ -124,21 +124,19 @@ while IFS=$'\t' read -r COLLECTOR_ID COLLECTOR_NAME COLLECTOR_IP COLLECTOR_DOMAI
     
     # Method: Generate INSERT statements with collector_id and execute them
     # Using a more robust approach to avoid variable expansion issues
-    QUERY="SELECT CONCAT(
-  'INSERT INTO $LOCAL_TABLE (collector_id, original_log_id, received_at, hostname, facility, message, port) VALUES (',
-  '$COLLECTOR_ID', ',',
-  id, ',',
-  QUOTE(received_at), ',',
-  QUOTE(hostname), ',',
-  QUOTE(facility), ',',
-  QUOTE(message), ',',
-  QUOTE(port), ');'
-) FROM $REMOTE_TABLE 
-WHERE id > $LAST_LOCAL_ID 
-ORDER BY id 
-LIMIT $ROWS_TO_FETCH;"
-    
-    echo "$QUERY" | mysql -h $REMOTE_HOST -u $REMOTE_USER -p"$REMOTE_PASS" -N -B $REMOTE_DB | mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB 2>&1
+    mysql -h $REMOTE_HOST -u $REMOTE_USER -p"$REMOTE_PASS" -N -B $REMOTE_DB -e "SELECT CONCAT(
+      'INSERT INTO $LOCAL_TABLE (collector_id, original_log_id, received_at, hostname, facility, message, port) VALUES (',
+      '$COLLECTOR_ID', ',',
+      id, ',',
+      QUOTE(received_at), ',',
+      QUOTE(hostname), ',',
+      QUOTE(facility), ',',
+      QUOTE(message), ',',
+      QUOTE(port), ');'
+    ) FROM $REMOTE_TABLE 
+    WHERE id > $LAST_LOCAL_ID 
+    ORDER BY id 
+    LIMIT $ROWS_TO_FETCH;" | mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB 2>&1
     
     TRANSFER_EXIT=$?
     
