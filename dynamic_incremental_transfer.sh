@@ -183,6 +183,74 @@ EOF
     mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -t -e "SELECT id, original_log_id, received_at, hostname, LEFT(message, 50) as message_preview, port FROM $LOCAL_TABLE WHERE collector_id = $COLLECTOR_ID AND original_log_id > $LAST_LOCAL_ID ORDER BY original_log_id LIMIT 5;" 2>/dev/null
     
     echo ""
+    
+    # Process newly transferred logs for parsing
+    echo "Processing newly transferred logs for parsing..."
+    # Call PHP parser to process new logs for this collector
+    # Check both Windows and Linux paths
+    if [ -f "/var/www/html/syslog-analyzer-permission/message_parser.php" ]; then
+        php_message_parser="/var/www/html/syslog-analyzer-permission/message_parser.php"
+    elif [ -f "/c/xampp/htdocs/analyzer/syslog-analyzer-permissions/message_parser.php" ]; then
+        php_message_parser="/c/xampp/htdocs/analyzer/syslog-analyzer-permissions/message_parser.php"
+    else
+        php_message_parser="message_parser.php"
+    fi
+    
+    if [ -f "$php_message_parser" ]; then
+        # Create a temporary PHP script to process the new logs
+        TEMP_PHP_SCRIPT=$(mktemp --suffix=.php)
+        cat > "$TEMP_PHP_SCRIPT" << EOF
+<?php
+require_once '$php_message_parser';
+
+// Database connection
+try {
+    $pdo = new PDO("mysql:host=localhost;dbname=analyzer", "ruser", "ruser1@Analyzer");
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die("Connection failed: " . $e->getMessage());
+}
+
+$parser = new MessageParser($pdo);
+
+// Get the collector ID and last local ID from command line args
+$collectorId = $argv[1];
+$lastLocalId = $argv[2];
+
+// Fetch new logs that need parsing
+$stmt = $pdo->prepare("SELECT id, message, collector_id, port FROM log_mirror WHERE collector_id = ? AND original_log_id > ? ORDER BY id");
+$stmt->execute([$collectorId, $lastLocalId]);
+
+$processed = 0;
+$successful = 0;
+
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    $processed++;
+    echo "Processing log ID: " . $row['id'] . " for collector: " . $row['collector_id'] . "\n";
+    
+    $result = $parser->parseMessage($row['message'], $row['id'], $row['collector_id'], $row['port']);
+    
+    if ($result) {
+        $successful++;
+        echo "Successfully parsed log ID: " . $row['id'] . "\n";
+    } else {
+        echo "Failed to parse log ID: " . $row['id'] . "\n";
+    }
+}
+
+echo "Parsing completed. Processed: $processed, Successful: $successful\n";
+EOF
+        
+        # Execute the temporary PHP script with collector ID and last local ID as parameters
+        php "$TEMP_PHP_SCRIPT" "$COLLECTOR_ID" "$LAST_LOCAL_ID"
+        
+        # Clean up the temporary file
+        rm "$TEMP_PHP_SCRIPT"
+    else
+        echo "Warning: Message parser not found at $php_message_parser"
+    fi
+    
+    echo ""
     echo "------------------------------------------"
     
 done <<< "$COLLECTORS_DATA"
