@@ -299,14 +299,14 @@ if (file_exists('$php_device_manager')) {
     require_once '$php_device_manager';
     // Check if class exists before instantiating
     if (class_exists('DeviceManager')) {
-        $deviceManager = new DeviceManager($pdo);
+        \$deviceManager = new DeviceManager(\$pdo);
     } else {
         echo "Warning: DeviceManager class not found despite file existing.\n";
-        $deviceManager = null;
+        \$deviceManager = null;
     }
 } else {
     echo "Warning: device_manager.php not found at $php_device_manager. Devices will not be registered.\n";
-    $deviceManager = null;
+    \$deviceManager = null;
 }
 
 // Update the system_action_manager path in message_parser

@@ -1,0 +1,152 @@
+root@analyzer-virtual-machine:/var/www/html/syslog-analyzer-permission# ls
+'analyzer (4).sql'   connection.php       dynamic_incremental_transfer.sh   logs                 setup-analyzer-permissions.sh    system_action_manager.php
+ auto_sync.sh        device_manager.php   incremental_transfer.sh           message_parser.php   setup-analyzer-permissions.txt
+root@analyzer-virtual-machine:/var/www/html/syslog-analyzer-permission# chmod +x dynamic_incremental_transfer.sh
+root@analyzer-virtual-machine:/var/www/html/syslog-analyzer-permission# bash dynamic_incremental_transfer.sh
+==========================================
+Dynamic Multi-Collector Incremental Sync
+Log File: logs/dynamic_transfer_20260112_124709.log
+==========================================
+==========================================
+Dynamic Multi-Collector Incremental Sync
+==========================================
+
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Found 1 active collector(s)
+
+------------------------------------------
+Processing Collector: Collector 1 (ID: 4)
+IP: 192.168.0.91 | Domain: https://192.168.0.91
+Last fetched ID: 0
+------------------------------------------
+Testing connection to collector Collector 1 at 192.168.0.91...
+1
+1
+✓ Connection successful
+
+Last fetched ID for collector 4: 0
+Max remote ID: 54751
+New rows available: 54751
+Fetching first 5000 rows (batch limit)
+
+Starting incremental transfer for collector Collector 1...
+Fetching rows with id > 0 (limit 5000)
+
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DEBUG: Generated 5000 potential INSERT lines
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DEBUG: Successfully inserted 5000 rows into main table
+==========================================
+Sync Complete for Collector Collector 1!
+==========================================
+Duration: 1.375054 seconds
+Rows transferred: 9521
+Previous max ID: 0
+New max ID: 9521
+Transfer rate: 6924.08 rows/second
+
+⚠ 45230 rows still remaining on remote server for collector Collector 1
+Run the script again to fetch more data
+
+Sample of newly transferred data for collector Collector 1:
++----+-----------------+---------------------+---------------------------+----------------------------------------------------+------+
+| id | original_log_id | received_at         | hostname                  | message_preview                                    | port |
++----+-----------------+---------------------+---------------------------+----------------------------------------------------+------+
+|  1 |               1 | 2025-11-17 07:48:22 | MGLNDD_52.221.227.124_512 |                                                    |  512 |
+|  2 |               2 | 2025-11-17 10:06:04 | MGLNDD_52.221.227.124_520 |                                                    |  520 |
+|  3 |            4524 | 2025-11-19 04:46:57 | DiskStation               |  Event: write, Path: /Printing/Printing/@@MEDIA OR |  516 |
+|  4 |            4525 | 2025-11-19 04:46:57 | DiskStation               |  Event: create, Path: /Printing/Printing/@@MEDIA O |  516 |
+|  5 |            4526 | 2025-11-19 04:46:57 | DiskStation               |  Event: write, Path: /Printing/Printing/@@MEDIA OR |  516 |
++----+-----------------+---------------------+---------------------------+----------------------------------------------------+------+
+
+Processing newly transferred logs for parsing...
+PHP Parse error:  syntax error, unexpected '=' in /tmp/tmp.qQKu29uHmC.php on line 17
+
+------------------------------------------
+==========================================
+All collectors processed!
+==========================================
+Overall Sync Status:
+  Total local log entries: 5000
+  Active collectors: 1
+==========================================
+root@analyzer-virtual-machine:/var/www/html/syslog-analyzer-permission# mysql -u ruser -p
+Enter password:
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 291
+Server version: 8.0.42-0ubuntu0.20.04.1 (Ubuntu)
+
+Copyright (c) 2000, 2025, Oracle and/or its affiliates.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> SELECT * FROM parsed_logs LIMIT 50;
+ERROR 1046 (3D000): No database selected
+mysql> SELECT * FROM analyzer.parsed_logs LIMIT 50;
+Empty set (0.01 sec)
+
+mysql> SELECT * FROM analyzer.log_mirror LIMIT 50;
++----+--------------+-----------------+---------------------+---------------------------+----------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+------+---------------------+
+| id | collector_id | original_log_id | received_at         | hostname                  | facility | message                                                                                                                                                                                                       | port | created_at          |
++----+--------------+-----------------+---------------------+---------------------------+----------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+------+---------------------+
+|  1 |            4 |               1 | 2025-11-17 07:48:22 | MGLNDD_52.221.227.124_512 | user     |                                                                                                                                                                                                               |  512 | 2026-01-12 12:47:10 |
+|  2 |            4 |               2 | 2025-11-17 10:06:04 | MGLNDD_52.221.227.124_520 | user     |                                                                                                                                                                                                               |  520 | 2026-01-12 12:47:10 |
+|  3 |            4 |            4524 | 2025-11-19 04:46:57 | DiskStation               | user     |  Event: write, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.26 AM (1).jpeg, File/Folder: File, Size: 64.00 KB, User: admin, IP: 192.168.100.30    |  516 | 2026-01-12 12:47:10 |
+|  4 |            4 |            4525 | 2025-11-19 04:46:57 | DiskStation               | user     |  Event: create, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.27 AM.jpeg, File/Folder: File, Size: 0 Bytes, User: admin, IP: 192.168.100.30        |  516 | 2026-01-12 12:47:10 |
+|  5 |            4 |            4526 | 2025-11-19 04:46:57 | DiskStation               | user     |  Event: write, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.27 AM.jpeg, File/Folder: File, Size: 64.00 KB, User: admin, IP: 192.168.100.30        |  516 | 2026-01-12 12:47:10 |
+|  6 |            4 |            4527 | 2025-11-19 04:47:08 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.46.33 AM.jpeg, File/Folder: File, Size: 24.29 KB, User: admin, IP: 192.168.100.30         |  516 | 2026-01-12 12:47:10 |
+|  7 |            4 |            4528 | 2025-11-19 04:47:08 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.27 AM.jpeg, File/Folder: File, Size: 71.43 KB, User: admin, IP: 192.168.100.30         |  516 | 2026-01-12 12:47:10 |
+|  8 |            4 |            4529 | 2025-11-19 04:47:08 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.26 AM.jpeg, File/Folder: File, Size: 22.28 KB, User: admin, IP: 192.168.100.30         |  516 | 2026-01-12 12:47:10 |
+|  9 |            4 |            4530 | 2025-11-19 04:47:08 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.26 AM (1).jpeg, File/Folder: File, Size: 111.12 KB, User: admin, IP: 192.168.100.30    |  516 | 2026-01-12 12:47:10 |
+| 10 |            4 |            4531 | 2025-11-19 04:47:10 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.26 AM (1).jpeg, File/Folder: File, Size: 111.12 KB, User: admin, IP: 192.168.100.30    |  516 | 2026-01-12 12:47:10 |
+| 11 |            4 |            4532 | 2025-11-19 04:47:10 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.26 AM (1).jpeg, File/Folder: File, Size: 111.12 KB, User: admin, IP: 192.168.100.30    |  516 | 2026-01-12 12:47:10 |
+| 12 |            4 |            4533 | 2025-11-19 04:47:11 | DiskStation               | user     |  SYSTEM:#011Last message 'Event: read, Path: /' repeated 3 times, suppressed by syslog-ng on DiskStation                                                                                                      |  516 | 2026-01-12 12:47:10 |
+| 13 |            4 |            4534 | 2025-11-19 04:47:11 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.26 AM.jpeg, File/Folder: File, Size: 22.28 KB, User: admin, IP: 192.168.100.30         |  516 | 2026-01-12 12:47:10 |
+| 14 |            4 |            4535 | 2025-11-19 04:47:12 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.26 AM.jpeg, File/Folder: File, Size: 22.28 KB, User: admin, IP: 192.168.100.30         |  516 | 2026-01-12 12:47:10 |
+| 15 |            4 |            4536 | 2025-11-19 04:47:12 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.26 AM.jpeg, File/Folder: File, Size: 22.28 KB, User: admin, IP: 192.168.100.30         |  516 | 2026-01-12 12:47:10 |
+| 16 |            4 |            4537 | 2025-11-19 04:47:13 | DiskStation               | user     |  SYSTEM:#011Last message 'Event: read, Path: /' repeated 2 times, suppressed by syslog-ng on DiskStation                                                                                                      |  516 | 2026-01-12 12:47:10 |
+| 17 |            4 |            4538 | 2025-11-19 04:47:13 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.27 AM.jpeg, File/Folder: File, Size: 71.43 KB, User: admin, IP: 192.168.100.30         |  516 | 2026-01-12 12:47:10 |
+| 18 |            4 |            4539 | 2025-11-19 04:47:13 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.27 AM.jpeg, File/Folder: File, Size: 71.43 KB, User: admin, IP: 192.168.100.30         |  516 | 2026-01-12 12:47:10 |
+| 19 |            4 |            4540 | 2025-11-19 04:47:13 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.27 AM.jpeg, File/Folder: File, Size: 71.43 KB, User: admin, IP: 192.168.100.30         |  516 | 2026-01-12 12:47:10 |
+| 20 |            4 |            4541 | 2025-11-19 04:47:14 | DiskStation               | user     |  SYSTEM:#011Last message 'Event: read, Path: /' repeated 2 times, suppressed by syslog-ng on DiskStation                                                                                                      |  516 | 2026-01-12 12:47:10 |
+| 21 |            4 |            4542 | 2025-11-19 04:47:14 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.46.33 AM.jpeg, File/Folder: File, Size: 24.29 KB, User: admin, IP: 192.168.100.30         |  516 | 2026-01-12 12:47:10 |
+| 22 |            4 |            4543 | 2025-11-19 04:47:14 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.46.33 AM.jpeg, File/Folder: File, Size: 24.29 KB, User: admin, IP: 192.168.100.30         |  516 | 2026-01-12 12:47:10 |
+| 23 |            4 |            4544 | 2025-11-19 04:47:14 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.46.33 AM.jpeg, File/Folder: File, Size: 24.29 KB, User: admin, IP: 192.168.100.30         |  516 | 2026-01-12 12:47:10 |
+| 24 |            4 |            4545 | 2025-11-19 04:47:15 | DiskStation               | user     |  SYSTEM:#011Last message 'Event: read, Path: /' repeated 2 times, suppressed by syslog-ng on DiskStation                                                                                                      |  516 | 2026-01-12 12:47:10 |
+| 25 |            4 |            4546 | 2025-11-19 04:47:15 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.25 AM (1).jpeg, File/Folder: File, Size: 40.36 KB, User: admin, IP: 192.168.100.30     |  516 | 2026-01-12 12:47:10 |
+| 26 |            4 |            4547 | 2025-11-19 04:47:15 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.25 AM (1).jpeg, File/Folder: File, Size: 40.36 KB, User: admin, IP: 192.168.100.30     |  516 | 2026-01-12 12:47:10 |
+| 27 |            4 |            4548 | 2025-11-19 04:47:15 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.25 AM (1).jpeg, File/Folder: File, Size: 40.36 KB, User: admin, IP: 192.168.100.30     |  516 | 2026-01-12 12:47:10 |
+| 28 |            4 |            4549 | 2025-11-19 04:47:16 | DiskStation               | user     |  SYSTEM:#011Last message 'Event: read, Path: /' repeated 2 times, suppressed by syslog-ng on DiskStation                                                                                                      |  516 | 2026-01-12 12:47:10 |
+| 29 |            4 |            4550 | 2025-11-19 04:47:16 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.25 AM (2).jpeg, File/Folder: File, Size: 31.90 KB, User: admin, IP: 192.168.100.30     |  516 | 2026-01-12 12:47:10 |
+| 30 |            4 |            4551 | 2025-11-19 04:47:16 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.25 AM (2).jpeg, File/Folder: File, Size: 31.90 KB, User: admin, IP: 192.168.100.30     |  516 | 2026-01-12 12:47:10 |
+| 31 |            4 |            4552 | 2025-11-19 04:47:16 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.25 AM (2).jpeg, File/Folder: File, Size: 31.90 KB, User: admin, IP: 192.168.100.30     |  516 | 2026-01-12 12:47:10 |
+| 32 |            4 |            4553 | 2025-11-19 04:47:17 | DiskStation               | user     |  SYSTEM:#011Last message 'Event: read, Path: /' repeated 2 times, suppressed by syslog-ng on DiskStation                                                                                                      |  516 | 2026-01-12 12:47:10 |
+| 33 |            4 |            4554 | 2025-11-19 04:47:17 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.25 AM.jpeg, File/Folder: File, Size: 25.45 KB, User: admin, IP: 192.168.100.30         |  516 | 2026-01-12 12:47:10 |
+| 34 |            4 |            4555 | 2025-11-19 04:47:17 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.25 AM.jpeg, File/Folder: File, Size: 25.45 KB, User: admin, IP: 192.168.100.30         |  516 | 2026-01-12 12:47:10 |
+| 35 |            4 |            4556 | 2025-11-19 04:47:17 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/15/WhatsApp Image 2025-11-18 at 5.42.25 AM.jpeg, File/Folder: File, Size: 25.45 KB, User: admin, IP: 192.168.100.30         |  516 | 2026-01-12 12:47:10 |
+| 36 |            4 |            4557 | 2025-11-19 04:47:24 | DiskStation               | user     |  SYSTEM:#011Last message 'Event: read, Path: /' repeated 2 times, suppressed by syslog-ng on DiskStation                                                                                                      |  516 | 2026-01-12 12:47:10 |
+| 37 |            4 |            4558 | 2025-11-19 04:47:24 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/@@MEDIA ORDERS/2025/11 November/2025.11.19/New folder/WhatsApp Image 2025-11-18 at 7.21.20 AM.jpeg, File/Folder: File, Size: 204.08 KB, User: user, IP: 192.168.100.64 |  516 | 2026-01-12 12:47:10 |
+| 38 |            4 |            4559 | 2025-11-19 04:49:08 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/D Numbers/2025/11 November/2025.11.17/Thumbs.db, File/Folder: File, Size: 33.50 KB, User: user, IP: 192.168.100.64                                                     |  516 | 2026-01-12 12:47:10 |
+| 39 |            4 |            4560 | 2025-11-19 04:49:08 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/D Numbers/2025/11 November/2025.11.17/img775 copy.psd, File/Folder: File, Size: 40.53 MB, User: user, IP: 192.168.100.64                                               |  516 | 2026-01-12 12:47:10 |
+| 40 |            4 |            4561 | 2025-11-19 04:49:08 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/D Numbers/2025/11 November/2025.11.17/img769 copy.psd, File/Folder: File, Size: 1.99 MB, User: user, IP: 192.168.100.64                                                |  516 | 2026-01-12 12:47:10 |
+| 41 |            4 |            4562 | 2025-11-19 04:49:11 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/D Numbers/2025/11 November/2025.11.17/10x12/Thumbs.db, File/Folder: File, Size: 11.50 KB, User: user, IP: 192.168.100.64                                               |  516 | 2026-01-12 12:47:10 |
+| 42 |            4 |            4563 | 2025-11-19 04:49:11 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/D Numbers/2025/11 November/2025.11.17/10x12/01.jpg, File/Folder: File, Size: 1.77 MB, User: user, IP: 192.168.100.64                                                   |  516 | 2026-01-12 12:47:10 |
+| 43 |            4 |            4564 | 2025-11-19 04:49:11 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/D Numbers/2025/11 November/2025.11.17/10x12/01.jpg, File/Folder: File, Size: 1.77 MB, User: user, IP: 192.168.100.64                                                   |  516 | 2026-01-12 12:47:10 |
+| 44 |            4 |            4565 | 2025-11-19 04:49:11 | DiskStation               | user     |  SYSTEM:#011Last message 'Event: read, Path: /' repeated 1 times, suppressed by syslog-ng on DiskStation                                                                                                      |  516 | 2026-01-12 12:47:10 |
+| 45 |            4 |            4566 | 2025-11-19 04:49:11 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/D Numbers/2025/11 November/2025.11.17/16/img737 copy.psd, File/Folder: File, Size: 35.98 MB, User: user, IP: 192.168.100.64                                            |  516 | 2026-01-12 12:47:10 |
+| 46 |            4 |            4567 | 2025-11-19 04:49:11 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/D Numbers/2025/11 November/2025.11.17/16/img737 copy.jpg, File/Folder: File, Size: 1.02 MB, User: user, IP: 192.168.100.64                                             |  516 | 2026-01-12 12:47:10 |
+| 47 |            4 |            4568 | 2025-11-19 04:49:11 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/D Numbers/2025/11 November/2025.11.17/16/img737 copy.jpg, File/Folder: File, Size: 1.02 MB, User: user, IP: 192.168.100.64                                             |  516 | 2026-01-12 12:47:10 |
+| 48 |            4 |            4569 | 2025-11-19 04:49:12 | DiskStation               | user     |  SYSTEM:#011Last message 'Event: read, Path: /' repeated 1 times, suppressed by syslog-ng on DiskStation                                                                                                      |  516 | 2026-01-12 12:47:10 |
+| 49 |            4 |            4570 | 2025-11-19 04:49:12 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/D Numbers/2025/11 November/2025.11.17/71/img735 copy.psd, File/Folder: File, Size: 30.03 MB, User: user, IP: 192.168.100.64                                            |  516 | 2026-01-12 12:47:10 |
+| 50 |            4 |            4571 | 2025-11-19 04:49:12 | DiskStation               | user     |  Event: read, Path: /Printing/Printing/D Numbers/2025/11 November/2025.11.17/img769.jpg, File/Folder: File, Size: 45.05 KB, User: user, IP: 192.168.100.64                                                    |  516 | 2026-01-12 12:47:10 |
++----+--------------+-----------------+---------------------+---------------------------+----------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+------+---------------------+
+50 rows in set (0.00 sec)
+
+mysql> SELECT * FROM analyzer.devices LIMIT 50;
+Empty set (0.00 sec)
+
+mysql>
