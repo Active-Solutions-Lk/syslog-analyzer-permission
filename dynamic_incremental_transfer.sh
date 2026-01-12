@@ -258,7 +258,7 @@ if (file_exists('$php_message_parser')) {
         }
     }
     
-    \$parser = new CustomMessageParser(\$pdo);
+    $parser = new CustomMessageParser($pdo);
 } else {
     die("message_parser.php not found");
 }
