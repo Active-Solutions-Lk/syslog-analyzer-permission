@@ -376,9 +376,12 @@ if (file_exists('$php_message_parser')) {
 \$processed = 0;
 \$successful = 0;
 \$registeredDevices = [];
+\$lastProcessedId = 0;
+\$startTime = microtime(true);
 
 while (\$row = \$stmt->fetch(PDO::FETCH_ASSOC)) {
     \$processed++;
+    \$lastProcessedId = \$row['id'];
 
     // Register device if available
     if (\$deviceManager) {
@@ -388,19 +391,18 @@ while (\$row = \$stmt->fetch(PDO::FETCH_ASSOC)) {
             \$registeredDevices[\$deviceKey] = true;
         }
     }
-    echo "Processing log ID: " . \$row['id'] . " for collector: " . \$row['collector_id'] . "\n";
     
     \$result = \$parser->parseMessage(\$row['message'], \$row['id'], \$row['collector_id'], \$row['port']);
     
     if (\$result) {
         \$successful++;
-        echo "Successfully parsed log ID: " . \$row['id'] . "\n";
-    } else {
-        echo "Failed to parse log ID: " . \$row['id'] . "\n";
     }
 }
 
-echo "Parsing completed. Processed: \$processed, Successful: \$successful\n";
+\$endTime = microtime(true);
+\$duration = number_format(\$endTime - \$startTime, 4);
+
+echo "Parsing Complete | Processed: \$processed | Successful: \$successful | Last ID: \$lastProcessedId | Time: {\$duration}s\n";
 EOF_PHP
         
         # Execute the temporary PHP script with collector ID and last local ID as parameters
