@@ -222,7 +222,8 @@ while IFS=$'\t' read -r COLLECTOR_ID COLLECTOR_NAME COLLECTOR_IP COLLECTOR_DOMAI
         fi
         # Create a temporary PHP script to process the new logs
         TEMP_PHP_SCRIPT=$(mktemp --suffix=.php)
-        cat > "$TEMP_PHP_SCRIPT" << 'EOF_PHP'
+        # Use double quotes to allow variable substitution in the heredoc
+        cat > "$TEMP_PHP_SCRIPT" << EOF_PHP
 <?php
 // Include the standardized connection
 // Check for connection.php in various locations
@@ -257,7 +258,7 @@ if (file_exists('$php_message_parser')) {
         }
     }
     
-    $parser = new CustomMessageParser($pdo);
+    \$parser = new CustomMessageParser(\$pdo);
 } else {
     die("message_parser.php not found");
 }
