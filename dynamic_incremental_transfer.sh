@@ -122,45 +122,63 @@ while IFS=$'\t' read -r COLLECTOR_ID COLLECTOR_NAME COLLECTOR_IP COLLECTOR_DOMAI
     # Start timing
     START_TIME=$(date +%s.%N)
     
-    # Method: Transfer data using a simple and reliable approach
-    # First get the data from remote database and save to temporary file
-    TMP_FILE=$(mktemp)
+    # Method: Transfer data using direct MySQL commands to avoid LOAD DATA issues
+    # Create a temporary SQL file to execute the transfer
+    TRANSFER_SQL=$(mktemp --suffix=.sql)
     
-    # Export data from remote as tab-separated values
-    mysql -h $REMOTE_HOST -u $REMOTE_USER -p"$REMOTE_PASS" -N -B $REMOTE_DB -e "SELECT id, received_at, hostname, facility, message, port FROM $REMOTE_TABLE WHERE id > $LAST_LOCAL_ID ORDER BY id LIMIT $ROWS_TO_FETCH;" > "$TMP_FILE"
+    # Create SQL that gets remote data and inserts it locally with collector_id
+    cat > "$TRANSFER_SQL" << EOF_TRANSFER
+INSERT INTO $LOCAL_TABLE (collector_id, original_log_id, received_at, hostname, facility, message, port)
+SELECT $COLLECTOR_ID,
+       remote_data.id,
+       remote_data.received_at,
+       remote_data.hostname,
+       remote_data.facility,
+       remote_data.message,
+       remote_data.port
+FROM (
+    SELECT id, received_at, hostname, facility, message, port
+    FROM $REMOTE_TABLE
+    WHERE id > $LAST_LOCAL_ID
+    ORDER BY id
+    LIMIT $ROWS_TO_FETCH
+) AS remote_data;
+EOF_TRANSFER
     
-    # Count lines in temp file to debug
-    ROW_COUNT=$(wc -l < "$TMP_FILE")
-    echo "DEBUG: Temp file has $ROW_COUNT lines"
+    # Execute the SQL on the local database by first getting data from remote and then executing the insert
+    # We'll use a different approach - create a script that generates INSERT statements
+    INSERT_SCRIPT=$(mktemp)
     
-    # Check if we got any data
-    if [ -s "$TMP_FILE" ]; then
-        # Create a temporary table to store the fetched data
-        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "CREATE TEMPORARY TABLE temp_data_fetch (remote_id INT, received_at_val DATETIME, hostname_val VARCHAR(255), facility_val VARCHAR(100), message_val TEXT, port_val INT);" 2>/dev/null
+    # Get the data from remote and format as INSERT statements
+    mysql -h $REMOTE_HOST -u $REMOTE_USER -p"$REMOTE_PASS" -N -B $REMOTE_DB -e "SELECT CONCAT('($COLLECTOR_ID,', id, ',', IFNULL(CONCAT('\'', QUOTE(received_at), '\''), 'NULL'), ',', IFNULL(CONCAT('\'', QUOTE(hostname), '\''), 'NULL'), ',', IFNULL(CONCAT('\'', QUOTE(facility), '\''), 'NULL'), ',', IFNULL(CONCAT('\'', QUOTE(message), '\''), 'NULL'), ',', IFNULL(port, 'NULL'), '),') FROM $REMOTE_TABLE WHERE id > $LAST_LOCAL_ID ORDER BY id LIMIT $ROWS_TO_FETCH;" > "$INSERT_SCRIPT"
+    
+    # Count lines to debug
+    ROW_COUNT=$(wc -l < "$INSERT_SCRIPT")
+    echo "DEBUG: Generated $ROW_COUNT potential INSERT lines"
+    
+    if [ -s "$INSERT_SCRIPT" ] && [ $ROW_COUNT -gt 0 ]; then
+        # Wrap the INSERT statements in a proper INSERT statement
+        INSERT_WRAPPER=$(mktemp)
+        echo "INSERT INTO $LOCAL_TABLE (collector_id, original_log_id, received_at, hostname, facility, message, port) VALUES" > "$INSERT_WRAPPER"
+        sed '$ s/,$//' "$INSERT_SCRIPT" >> "$INSERT_WRAPPER"  # Remove trailing comma from last line
+        echo ";" >> "$INSERT_WRAPPER"
         
-        # Load the exported data into the temporary table
-        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "LOAD DATA LOCAL INFILE '$TMP_FILE' INTO TABLE temp_data_fetch FIELDS TERMINATED BY '\t' LINES TERMINATED BY '\n';" 2>/dev/null
+        # Execute the INSERT
+        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB < "$INSERT_WRAPPER"
         
-        # Count how many rows were loaded into temp table
-        TEMP_COUNT=$(mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -N -e "SELECT COUNT(*) FROM temp_data_fetch;" 2>/dev/null)
-        echo "DEBUG: Loaded $TEMP_COUNT rows into temp table"
-        
-        # Insert the data into the main table with collector_id
-        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "INSERT INTO $LOCAL_TABLE (collector_id, original_log_id, received_at, hostname, facility, message, port) SELECT $COLLECTOR_ID, remote_id, received_at_val, hostname_val, facility_val, message_val, port_val FROM temp_data_fetch;" 2>/dev/null
-        
-        # Count how many rows were inserted into main table
+        # Count how many rows were inserted
         INSERTED_COUNT=$(mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -N -e "SELECT COUNT(*) FROM $LOCAL_TABLE WHERE collector_id = $COLLECTOR_ID AND original_log_id > $LAST_LOCAL_ID;" 2>/dev/null)
-        echo "DEBUG: Inserted $INSERTED_COUNT rows into main table"
+        echo "DEBUG: Successfully inserted $INSERTED_COUNT rows into main table"
         
-        # Drop the temporary table
-        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "DROP TEMPORARY TABLE temp_data_fetch;" 2>/dev/null
+        # Clean up wrapper
+        rm -f "$INSERT_WRAPPER"
     else
-        echo "DEBUG: No data in temp file"
         INSERTED_COUNT=0
+        echo "DEBUG: No data to insert"
     fi
     
-    # Clean up the temporary file
-    rm -f "$TMP_FILE"
+    # Clean up
+    rm -f "$TRANSFER_SQL" "$INSERT_SCRIPT"
     
     # Set TRANSFER_EXIT based on whether we inserted data
     if [ "$INSERTED_COUNT" -gt 0 ]; then
