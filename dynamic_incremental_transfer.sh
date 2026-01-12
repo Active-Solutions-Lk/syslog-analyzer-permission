@@ -122,9 +122,27 @@ while IFS=$'\t' read -r COLLECTOR_ID COLLECTOR_NAME COLLECTOR_IP COLLECTOR_DOMAI
     # Start timing
     START_TIME=$(date +%s.%N)
     
-    # Method: Generate INSERT statements with collector_id and execute them
-    # Using a more robust approach to avoid variable expansion issues
-    mysql -h $REMOTE_HOST -u $REMOTE_USER -p"$REMOTE_PASS" -N -B $REMOTE_DB -e "SELECT CONCAT('INSERT INTO $LOCAL_TABLE (collector_id, original_log_id, received_at, hostname, facility, message, port) VALUES (', '$COLLECTOR_ID', ',', id, ',', QUOTE(received_at), ',', QUOTE(hostname), ',', QUOTE(facility), ',', QUOTE(message), ',', QUOTE(port), ');') FROM $REMOTE_TABLE WHERE id > $LAST_LOCAL_ID ORDER BY id LIMIT $ROWS_TO_FETCH;" | mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB 2>&1
+    # Method: Transfer data using direct dump/load approach to avoid complex quoting issues
+    TMP_FILE=$(mktemp)
+    mysql -h $REMOTE_HOST -u $REMOTE_USER -p"$REMOTE_PASS" -N -B $REMOTE_DB -e "SELECT id, received_at, hostname, facility, message, port FROM $REMOTE_TABLE WHERE id > $LAST_LOCAL_ID ORDER BY id LIMIT $ROWS_TO_FETCH;" > "$TMP_FILE"
+    
+    # Check if we got data
+    if [ -s "$TMP_FILE" ]; then
+        # Import the data with collector_id using a temporary table approach
+        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "CREATE TEMPORARY TABLE temp_logs (id INT, received_at DATETIME, hostname VARCHAR(255), facility VARCHAR(100), message TEXT, port INT);" 2>/dev/null
+        
+        # Load the data into the temporary table
+        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "LOAD DATA LOCAL INFILE '$TMP_FILE' INTO TABLE temp_logs FIELDS TERMINATED BY '\t' LINES TERMINATED BY '\n';" 2>/dev/null
+        
+        # Insert into the main table with the collector_id
+        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "INSERT INTO $LOCAL_TABLE (collector_id, original_log_id, received_at, hostname, facility, message, port) SELECT $COLLECTOR_ID, id, received_at, hostname, facility, message, port FROM temp_logs;" 2>/dev/null
+        
+        # Clean up
+        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "DROP TEMPORARY TABLE temp_logs;" 2>/dev/null
+    fi
+    
+    # Clean up temp file
+    rm -f "$TMP_FILE"
     
     TRANSFER_EXIT=$?
     
