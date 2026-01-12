@@ -122,26 +122,29 @@ while IFS=$'\t' read -r COLLECTOR_ID COLLECTOR_NAME COLLECTOR_IP COLLECTOR_DOMAI
     # Start timing
     START_TIME=$(date +%s.%N)
     
-    # Method: Transfer data using direct dump/load approach to avoid complex quoting issues
+    # Method: Transfer data using a simple and reliable approach
+    # First get the data from remote database and save to temporary file
     TMP_FILE=$(mktemp)
+    
+    # Export data from remote as tab-separated values
     mysql -h $REMOTE_HOST -u $REMOTE_USER -p"$REMOTE_PASS" -N -B $REMOTE_DB -e "SELECT id, received_at, hostname, facility, message, port FROM $REMOTE_TABLE WHERE id > $LAST_LOCAL_ID ORDER BY id LIMIT $ROWS_TO_FETCH;" > "$TMP_FILE"
     
-    # Check if we got data
+    # Check if we got any data
     if [ -s "$TMP_FILE" ]; then
-        # Import the data with collector_id using a temporary table approach
-        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "CREATE TEMPORARY TABLE temp_logs (id INT, received_at DATETIME, hostname VARCHAR(255), facility VARCHAR(100), message TEXT, port INT);" 2>/dev/null
+        # Create a temporary table to store the fetched data
+        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "CREATE TEMPORARY TABLE temp_data_fetch (remote_id INT, received_at_val DATETIME, hostname_val VARCHAR(255), facility_val VARCHAR(100), message_val TEXT, port_val INT);" 2>/dev/null
         
-        # Load the data into the temporary table
-        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "LOAD DATA LOCAL INFILE '$TMP_FILE' INTO TABLE temp_logs FIELDS TERMINATED BY '\t' LINES TERMINATED BY '\n';" 2>/dev/null
+        # Load the exported data into the temporary table
+        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "LOAD DATA LOCAL INFILE '$TMP_FILE' INTO TABLE temp_data_fetch FIELDS TERMINATED BY '\t' LINES TERMINATED BY '\n';" 2>/dev/null
         
-        # Insert into the main table with the collector_id
-        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "INSERT INTO $LOCAL_TABLE (collector_id, original_log_id, received_at, hostname, facility, message, port) SELECT $COLLECTOR_ID, id, received_at, hostname, facility, message, port FROM temp_logs;" 2>/dev/null
+        # Insert the data into the main table with collector_id
+        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "INSERT INTO $LOCAL_TABLE (collector_id, original_log_id, received_at, hostname, facility, message, port) SELECT $COLLECTOR_ID, remote_id, received_at_val, hostname_val, facility_val, message_val, port_val FROM temp_data_fetch;" 2>/dev/null
         
-        # Clean up
-        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "DROP TEMPORARY TABLE temp_logs;" 2>/dev/null
+        # Drop the temporary table
+        mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "DROP TEMPORARY TABLE temp_data_fetch;" 2>/dev/null
     fi
     
-    # Clean up temp file
+    # Clean up the temporary file
     rm -f "$TMP_FILE"
     
     TRANSFER_EXIT=$?
@@ -160,6 +163,15 @@ while IFS=$'\t' read -r COLLECTOR_ID COLLECTOR_NAME COLLECTOR_IP COLLECTOR_DOMAI
     
     # Verify transfer by checking the highest ID for this collector in our local table
     NEW_LOCAL_ID=$(mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -N -e "SELECT IFNULL(MAX(original_log_id), 0) FROM $LOCAL_TABLE WHERE collector_id = $COLLECTOR_ID;" 2>/dev/null)
+    
+    # The transfer might have failed silently or not updated the table properly
+    # Let's recalculate based on what should have been transferred
+    if [ "$NEW_LOCAL_ID" -eq "$LAST_LOCAL_ID" ]; then
+        # Calculate what the new max ID should be based on the transfer
+        # We transferred records with id > $LAST_LOCAL_ID up to $ROWS_TO_FETCH records
+        # Get the actual max original_log_id for this collector after the attempted transfer
+        NEW_LOCAL_ID=$(mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -N -e "SELECT IFNULL(MAX(original_log_id), $LAST_LOCAL_ID) FROM $LOCAL_TABLE WHERE collector_id = $COLLECTOR_ID;" 2>/dev/null)
+    fi
     TRANSFERRED_ROWS=$((NEW_LOCAL_ID - LAST_LOCAL_ID))
     
     # If no new records were inserted, calculate based on how many should have been transferred
@@ -294,6 +306,8 @@ if (file_exists('$php_message_parser')) {
 \$lastLocalId = \$argv[2];
 
 // Fetch new logs that need parsing
+// We need to find logs in log_mirror that correspond to the remote IDs that were just transferred
+// Since we transferred logs with remote ID > \$lastLocalId, we need to find them in our local table
 \$stmt = \$pdo->prepare("SELECT id, message, collector_id, port FROM log_mirror WHERE collector_id = ? AND original_log_id > ? ORDER BY id");
 \$stmt->execute([\$collectorId, \$lastLocalId]);
 
