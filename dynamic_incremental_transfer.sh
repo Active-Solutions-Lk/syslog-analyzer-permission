@@ -129,6 +129,10 @@ while IFS=$'\t' read -r COLLECTOR_ID COLLECTOR_NAME COLLECTOR_IP COLLECTOR_DOMAI
     # Export data from remote as tab-separated values
     mysql -h $REMOTE_HOST -u $REMOTE_USER -p"$REMOTE_PASS" -N -B $REMOTE_DB -e "SELECT id, received_at, hostname, facility, message, port FROM $REMOTE_TABLE WHERE id > $LAST_LOCAL_ID ORDER BY id LIMIT $ROWS_TO_FETCH;" > "$TMP_FILE"
     
+    # Count lines in temp file to debug
+    ROW_COUNT=$(wc -l < "$TMP_FILE")
+    echo "DEBUG: Temp file has $ROW_COUNT lines"
+    
     # Check if we got any data
     if [ -s "$TMP_FILE" ]; then
         # Create a temporary table to store the fetched data
@@ -137,17 +141,33 @@ while IFS=$'\t' read -r COLLECTOR_ID COLLECTOR_NAME COLLECTOR_IP COLLECTOR_DOMAI
         # Load the exported data into the temporary table
         mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "LOAD DATA LOCAL INFILE '$TMP_FILE' INTO TABLE temp_data_fetch FIELDS TERMINATED BY '\t' LINES TERMINATED BY '\n';" 2>/dev/null
         
+        # Count how many rows were loaded into temp table
+        TEMP_COUNT=$(mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -N -e "SELECT COUNT(*) FROM temp_data_fetch;" 2>/dev/null)
+        echo "DEBUG: Loaded $TEMP_COUNT rows into temp table"
+        
         # Insert the data into the main table with collector_id
         mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "INSERT INTO $LOCAL_TABLE (collector_id, original_log_id, received_at, hostname, facility, message, port) SELECT $COLLECTOR_ID, remote_id, received_at_val, hostname_val, facility_val, message_val, port_val FROM temp_data_fetch;" 2>/dev/null
         
+        # Count how many rows were inserted into main table
+        INSERTED_COUNT=$(mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -N -e "SELECT COUNT(*) FROM $LOCAL_TABLE WHERE collector_id = $COLLECTOR_ID AND original_log_id > $LAST_LOCAL_ID;" 2>/dev/null)
+        echo "DEBUG: Inserted $INSERTED_COUNT rows into main table"
+        
         # Drop the temporary table
         mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -e "DROP TEMPORARY TABLE temp_data_fetch;" 2>/dev/null
+    else
+        echo "DEBUG: No data in temp file"
+        INSERTED_COUNT=0
     fi
     
     # Clean up the temporary file
     rm -f "$TMP_FILE"
     
-    TRANSFER_EXIT=$?
+    # Set TRANSFER_EXIT based on whether we inserted data
+    if [ "$INSERTED_COUNT" -gt 0 ]; then
+        TRANSFER_EXIT=0
+    else
+        TRANSFER_EXIT=1
+    fi
     
     # End timing
     END_TIME=$(date +%s.%N)
