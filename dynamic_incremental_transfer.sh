@@ -238,23 +238,49 @@ if (file_exists('/var/www/html/syslog-analyzer-permission/connection.php')) {
 // Update the system_action_manager path in message_parser
 // Create a temporary message parser that references the correct system_action_manager path
 if (file_exists('$php_message_parser')) {
-    // Load the original message parser but with the correct system action manager path
     require_once '$php_message_parser';
     
-    // Override the constructor to use the correct system action manager path
-    class CustomMessageParser extends MessageParser {
-        public function __construct(\$pdo) {
-            \$this->pdo = \$pdo;
-            \$this->loadPatterns();
-            \$this->loadFieldRules();
-            
-            // Initialize system action manager with correct path
-            if (file_exists('$php_system_action_manager')) {
-                require_once '$php_system_action_manager';
-            } else {
-                die("system_action_manager.php not found");
+    // Define a new class that extends MessageParser to use the correct system_action_manager path
+    if (!class_exists('CustomMessageParser')) {
+        class CustomMessageParser extends MessageParser {
+            public function __construct(\$pdo) {
+                \$this->pdo = \$pdo;
+                
+                // Load patterns and field rules manually since parent constructor won't run
+                \$this->loadPatternsManually();
+                \$this->loadFieldRulesManually();
+                
+                // Initialize system action manager with correct path
+                if (file_exists('$php_system_action_manager')) {
+                    require_once '$php_system_action_manager';
+                } else {
+                    die("system_action_manager.php not found");
+                }
+                \$this->systemActionManager = new SystemActionManager(\$pdo);
             }
-            \$this->systemActionManager = new SystemActionManager(\$pdo);
+            
+            private function loadPatternsManually() {
+                \$this->patterns = [];
+                \$stmt = \$this->pdo->prepare("SELECT * FROM message_patterns ORDER BY priority DESC");
+                \$stmt->execute();
+                \$this->patterns = \$stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+            
+            private function loadFieldRulesManually() {
+                \$this->fieldRules = [];
+                \$stmt = \$this->pdo->prepare("SELECT * FROM field_extraction_rules");
+                \$stmt->execute();
+                \$rules = \$stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                foreach (\$rules as \$rule) {
+                    if (!isset(\$this->fieldRules[\$rule['pattern_id']])) {
+                        \$this->fieldRules[\$rule['pattern_id']] = [];
+                    }
+                    \$this->fieldRules[\$rule['pattern_id']][] = \$rule;
+                }
+            }
+            
+            // Inherit all other methods from MessageParser
         }
     }
     
