@@ -270,6 +270,15 @@ EOF_TRANSFER
         else
             php_system_action_manager="system_action_manager.php"
         fi
+
+        # Check for device_manager.php
+        if [ -f "/var/www/html/syslog-analyzer-permission/device_manager.php" ]; then
+            php_device_manager="/var/www/html/syslog-analyzer-permission/device_manager.php"
+        elif [ -f "/c/xampp/htdocs/analyzer/syslog-analyzer-permissions/device_manager.php" ]; then
+            php_device_manager="/c/xampp/htdocs/analyzer/syslog-analyzer-permissions/device_manager.php"
+        else
+            php_device_manager="device_manager.php"
+        fi
         # Create a temporary PHP script to process the new logs
         TEMP_PHP_SCRIPT=$(mktemp --suffix=.php)
         # Use double quotes to allow variable substitution in the heredoc
@@ -283,6 +292,21 @@ if (file_exists('/var/www/html/syslog-analyzer-permission/connection.php')) {
     require_once 'connection.php';
 } else {
     die("connection.php not found");
+}
+
+// Initialize device manager
+if (file_exists('$php_device_manager')) {
+    require_once '$php_device_manager';
+    // Check if class exists before instantiating
+    if (class_exists('DeviceManager')) {
+        $deviceManager = new DeviceManager($pdo);
+    } else {
+        echo "Warning: DeviceManager class not found despite file existing.\n";
+        $deviceManager = null;
+    }
+} else {
+    echo "Warning: device_manager.php not found at $php_device_manager. Devices will not be registered.\n";
+    $deviceManager = null;
 }
 
 // Update the system_action_manager path in message_parser
@@ -346,14 +370,24 @@ if (file_exists('$php_message_parser')) {
 // Fetch new logs that need parsing
 // We need to find logs in log_mirror that correspond to the remote IDs that were just transferred
 // Since we transferred logs with remote ID > \$lastLocalId, we need to find them in our local table
-\$stmt = \$pdo->prepare("SELECT id, message, collector_id, port FROM log_mirror WHERE collector_id = ? AND original_log_id > ? ORDER BY id");
+\$stmt = \$pdo->prepare("SELECT id, message, collector_id, port, hostname FROM log_mirror WHERE collector_id = ? AND original_log_id > ? ORDER BY id");
 \$stmt->execute([\$collectorId, \$lastLocalId]);
 
 \$processed = 0;
 \$successful = 0;
+\$registeredDevices = [];
 
 while (\$row = \$stmt->fetch(PDO::FETCH_ASSOC)) {
     \$processed++;
+
+    // Register device if available
+    if (\$deviceManager) {
+        \$deviceKey = \$row['collector_id'] . '_' . \$row['port'];
+        if (!isset(\$registeredDevices[\$deviceKey])) {
+            \$deviceManager->registerDevice(\$row['collector_id'], \$row['hostname'], \$row['port']);
+            \$registeredDevices[\$deviceKey] = true;
+        }
+    }
     echo "Processing log ID: " . \$row['id'] . " for collector: " . \$row['collector_id'] . "\n";
     
     \$result = \$parser->parseMessage(\$row['message'], \$row['id'], \$row['collector_id'], \$row['port']);
