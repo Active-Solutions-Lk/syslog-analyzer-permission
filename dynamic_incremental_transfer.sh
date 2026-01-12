@@ -69,15 +69,16 @@ while IFS=$'\t' read -r COLLECTOR_ID COLLECTOR_NAME COLLECTOR_IP COLLECTOR_DOMAI
     REMOTE_TABLE="remote_logs"
     
     # Test connection to remote collector
-    echo "Testing connection to collector $COLLECTOR_NAME at $REMOTE_HOST..."
+    # Test connection to remote collector
+    # echo "Testing connection to collector $COLLECTOR_NAME at $REMOTE_HOST..."
     mysql -h $REMOTE_HOST -u $REMOTE_USER -p"$REMOTE_PASS" -e "SELECT 1;" 2>/dev/null
     if [ $? -ne 0 ]; then
         echo "ERROR: Cannot connect to collector $COLLECTOR_NAME at $REMOTE_HOST"
         echo "Skipping this collector..."
         continue
     fi
-    echo "✓ Connection successful"
-    echo ""
+    # echo "✓ Connection successful"
+    # echo ""
     
     # Get last fetched ID for this specific collector from the database
     if [ -z "$LAST_FETCHED_ID" ] || [ "$LAST_FETCHED_ID" = "NULL" ]; then
@@ -154,7 +155,8 @@ EOF_TRANSFER
     
     # Count lines to debug
     ROW_COUNT=$(wc -l < "$INSERT_SCRIPT")
-    echo "DEBUG: Generated $ROW_COUNT potential INSERT lines"
+    ROW_COUNT=$(wc -l < "$INSERT_SCRIPT")
+    # echo "DEBUG: Generated $ROW_COUNT potential INSERT lines"
     
     if [ -s "$INSERT_SCRIPT" ] && [ $ROW_COUNT -gt 0 ]; then
         # Wrap the INSERT statements in a proper INSERT statement
@@ -168,13 +170,13 @@ EOF_TRANSFER
         
         # Count how many rows were inserted
         INSERTED_COUNT=$(mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -N -e "SELECT COUNT(*) FROM $LOCAL_TABLE WHERE collector_id = $COLLECTOR_ID AND original_log_id > $LAST_LOCAL_ID;" 2>/dev/null)
-        echo "DEBUG: Successfully inserted $INSERTED_COUNT rows into main table"
+        # echo "DEBUG: Successfully inserted $INSERTED_COUNT rows into main table"
         
         # Clean up wrapper
         rm -f "$INSERT_WRAPPER"
     else
         INSERTED_COUNT=0
-        echo "DEBUG: No data to insert"
+        # echo "DEBUG: No data to insert"
     fi
     
     # Clean up
@@ -244,8 +246,9 @@ EOF_TRANSFER
     echo ""
     
     # Show sample of newly transferred data for this collector
-    echo "Sample of newly transferred data for collector $COLLECTOR_NAME:"
-    mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -t -e "SELECT id, original_log_id, received_at, hostname, LEFT(message, 50) as message_preview, port FROM $LOCAL_TABLE WHERE collector_id = $COLLECTOR_ID AND original_log_id > $LAST_LOCAL_ID ORDER BY original_log_id LIMIT 5;" 2>/dev/null
+    # Show sample of newly transferred data for this collector
+    # echo "Sample of newly transferred data for collector $COLLECTOR_NAME:"
+    # mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -t -e "SELECT id, original_log_id, received_at, hostname, LEFT(message, 50) as message_preview, port FROM $LOCAL_TABLE WHERE collector_id = $COLLECTOR_ID AND original_log_id > $LAST_LOCAL_ID ORDER BY original_log_id LIMIT 5;" 2>/dev/null
     
     echo ""
     
@@ -417,17 +420,24 @@ EOF_PHP
     echo ""
     echo "------------------------------------------"
     
+    # Calculate Total Duration
+    PROCESS_END_TIME=$(date +%s.%N)
+    TOTAL_DURATION=$(echo "$PROCESS_END_TIME - $START_TIME" | bc)
+    printf "Total Process Duration: %.4f seconds\n" $TOTAL_DURATION
+
+    echo "------------------------------------------"
+    
 done <<< "$COLLECTORS_DATA"
 
-echo "=========================================="
-echo "All collectors processed!"
-echo "=========================================="
+# echo "=========================================="
+# echo "All collectors processed!"
+# echo "=========================================="
 
 # Show overall sync statistics
-TOTAL_LOCAL=$(mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -N -e "SELECT COUNT(*) FROM $LOCAL_TABLE;" 2>/dev/null)
-ACTIVE_COLLECTORS=$(mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -N -e "SELECT COUNT(*) FROM collectors WHERE is_active = 1;" 2>/dev/null)
+# TOTAL_LOCAL=$(mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -N -e "SELECT COUNT(*) FROM $LOCAL_TABLE;" 2>/dev/null)
+# ACTIVE_COLLECTORS=$(mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -N -e "SELECT COUNT(*) FROM collectors WHERE is_active = 1;" 2>/dev/null)
 
-echo "Overall Sync Status:"
-echo "  Total local log entries: $TOTAL_LOCAL"
-echo "  Active collectors: $ACTIVE_COLLECTORS"
-echo "=========================================="
+# echo "Overall Sync Status:"
+# echo "  Total local log entries: $TOTAL_LOCAL"
+# echo "  Active collectors: $ACTIVE_COLLECTORS"
+# echo "=========================================="
