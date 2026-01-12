@@ -1,10 +1,10 @@
 <?php
 
 class MessageParser {
-    private $pdo;
-    private $patterns;
-    private $fieldRules;
-    private $systemActionManager;
+    protected $pdo;
+    protected $patterns;
+    protected $fieldRules;
+    protected $systemActionManager;
 
     public function __construct($pdo) {
         $this->pdo = $pdo;
