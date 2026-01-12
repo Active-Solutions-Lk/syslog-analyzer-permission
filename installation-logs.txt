@@ -5,7 +5,7 @@ root@analyzer-virtual-machine:/var/www/html/syslog-analyzer-permission# chmod +x
 root@analyzer-virtual-machine:/var/www/html/syslog-analyzer-permission# bash dynamic_incremental_transfer.sh
 ==========================================
 Dynamic Multi-Collector Incremental Sync
-Log File: logs/dynamic_transfer_20260112_150011.log
+Log File: logs/dynamic_transfer_20260112_152615.log
 ==========================================
 ==========================================
 Dynamic Multi-Collector Incremental Sync
@@ -19,11 +19,8 @@ Processing Collector: Collector 1 (ID: 4)
 IP: 192.168.0.91 | Domain: https://192.168.0.91
 Last fetched ID: 0
 ------------------------------------------
-Testing connection to collector Collector 1 at 192.168.0.91...
 1
 1
-✓ Connection successful
-
 Last fetched ID for collector 4: 0
 Max remote ID: 54751
 New rows available: 54751
@@ -33,41 +30,24 @@ Starting incremental transfer for collector Collector 1...
 Fetching rows with id > 0 (limit 5000)
 
 mysql: [Warning] Using a password on the command line interface can be insecure.
-DEBUG: Generated 5000 potential INSERT lines
 mysql: [Warning] Using a password on the command line interface can be insecure.
-DEBUG: Successfully inserted 5000 rows into main table
 ==========================================
 Sync Complete for Collector Collector 1!
 ==========================================
-Duration: 1.365241 seconds
+Duration: 1.230298 seconds
 Rows transferred: 9521
 Previous max ID: 0
 New max ID: 9521
-Transfer rate: 6973.85 rows/second
+Transfer rate: 7738.77 rows/second
 
 ⚠ 45230 rows still remaining on remote server for collector Collector 1
 Run the script again to fetch more data
 
-Sample of newly transferred data for collector Collector 1:
-+----+-----------------+---------------------+---------------------------+----------------------------------------------------+------+
-| id | original_log_id | received_at         | hostname                  | message_preview                                    | port |
-+----+-----------------+---------------------+---------------------------+----------------------------------------------------+------+
-|  1 |               1 | 2025-11-17 07:48:22 | MGLNDD_52.221.227.124_512 |                                                    |  512 |
-|  2 |               2 | 2025-11-17 10:06:04 | MGLNDD_52.221.227.124_520 |                                                    |  520 |
-|  3 |            4524 | 2025-11-19 04:46:57 | DiskStation               |  Event: write, Path: /Printing/Printing/@@MEDIA OR |  516 |
-|  4 |            4525 | 2025-11-19 04:46:57 | DiskStation               |  Event: create, Path: /Printing/Printing/@@MEDIA O |  516 |
-|  5 |            4526 | 2025-11-19 04:46:57 | DiskStation               |  Event: write, Path: /Printing/Printing/@@MEDIA OR |  516 |
-+----+-----------------+---------------------+---------------------------+----------------------------------------------------+------+
 
 Processing newly transferred logs for parsing...
-Parsing Complete | Processed: 5000 | Successful: 4995 | Last ID: 5000 | Time: 43.1993s
+Parsing Complete | Processed: 5000 | Successful: 4995 | Last ID: 5000 | Time: 47.6313s
 
 ------------------------------------------
-==========================================
-All collectors processed!
-==========================================
-Overall Sync Status:
-  Total local log entries: 5000
-  Active collectors: 1
-==========================================
+Total Process Duration: 49.3907 seconds
+------------------------------------------
 root@analyzer-virtual-machine:/var/www/html/syslog-analyzer-permission#

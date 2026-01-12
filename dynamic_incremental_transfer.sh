@@ -94,8 +94,8 @@ while IFS=$'\t' read -r COLLECTOR_ID COLLECTOR_NAME COLLECTOR_IP COLLECTOR_DOMAI
     
     echo "Max remote ID: $MAX_REMOTE_ID"
     
-    # Calculate how many new rows
-    NEW_ROWS=$((MAX_REMOTE_ID - LAST_LOCAL_ID))
+    # Calculate how many new rows (using COUNT(*) for accuracy with non-contiguous IDs)
+    NEW_ROWS=$(mysql -h $REMOTE_HOST -u $REMOTE_USER -p"$REMOTE_PASS" $REMOTE_DB -N -e "SELECT COUNT(*) FROM $REMOTE_TABLE WHERE id > $LAST_LOCAL_ID;" 2>/dev/null)
     
     if [ $NEW_ROWS -le 0 ]; then
         echo ""
@@ -212,12 +212,8 @@ EOF_TRANSFER
         # Get the actual max original_log_id for this collector after the attempted transfer
         NEW_LOCAL_ID=$(mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -N -e "SELECT IFNULL(MAX(original_log_id), $LAST_LOCAL_ID) FROM $LOCAL_TABLE WHERE collector_id = $COLLECTOR_ID;" 2>/dev/null)
     fi
-    TRANSFERRED_ROWS=$((NEW_LOCAL_ID - LAST_LOCAL_ID))
-    
-    # If no new records were inserted, calculate based on how many should have been transferred
-    if [ $TRANSFERRED_ROWS -le 0 ]; then
-        TRANSFERRED_ROWS=$ROWS_TO_FETCH
-    fi
+    # Use the actual inserted count as the transferred rows count
+    TRANSFERRED_ROWS=$INSERTED_COUNT
     
     echo "=========================================="
     echo "Sync Complete for Collector $COLLECTOR_NAME!"
@@ -233,7 +229,9 @@ EOF_TRANSFER
     fi
     
     # Calculate remaining rows
-    REMAINING=$((MAX_REMOTE_ID - NEW_LOCAL_ID))
+    # Since NEW_ROWS was the total available, and we just transferred TRANSFERRED_ROWS
+    REMAINING=$((NEW_ROWS - TRANSFERRED_ROWS))
+    
     if [ $REMAINING -gt 0 ]; then
         echo ""
         echo "⚠ $REMAINING rows still remaining on remote server for collector $COLLECTOR_NAME"
