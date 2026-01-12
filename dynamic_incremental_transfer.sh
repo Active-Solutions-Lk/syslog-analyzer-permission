@@ -243,10 +243,10 @@ if (file_exists('$php_message_parser')) {
     
     // Override the constructor to use the correct system action manager path
     class CustomMessageParser extends MessageParser {
-        public function __construct($pdo) {
-            $this->pdo = $pdo;
-            $this->loadPatterns();
-            $this->loadFieldRules();
+        public function __construct(\$pdo) {
+            \$this->pdo = \$pdo;
+            \$this->loadPatterns();
+            \$this->loadFieldRules();
             
             // Initialize system action manager with correct path
             if (file_exists('$php_system_action_manager')) {
@@ -254,41 +254,41 @@ if (file_exists('$php_message_parser')) {
             } else {
                 die("system_action_manager.php not found");
             }
-            $this->systemActionManager = new SystemActionManager($pdo);
+            \$this->systemActionManager = new SystemActionManager(\$pdo);
         }
     }
     
-    $parser = new CustomMessageParser($pdo);
+    \$parser = new CustomMessageParser(\$pdo);
 } else {
     die("message_parser.php not found");
 }
 
 // Get the collector ID and last local ID from command line args
-$collectorId = $argv[1];
-$lastLocalId = $argv[2];
+\$collectorId = \$argv[1];
+\$lastLocalId = \$argv[2];
 
 // Fetch new logs that need parsing
-$stmt = $pdo->prepare("SELECT id, message, collector_id, port FROM log_mirror WHERE collector_id = ? AND original_log_id > ? ORDER BY id");
-$stmt->execute([$collectorId, $lastLocalId]);
+\$stmt = \$pdo->prepare("SELECT id, message, collector_id, port FROM log_mirror WHERE collector_id = ? AND original_log_id > ? ORDER BY id");
+\$stmt->execute([\$collectorId, \$lastLocalId]);
 
-$processed = 0;
-$successful = 0;
+\$processed = 0;
+\$successful = 0;
 
-while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-    $processed++;
-    echo "Processing log ID: " . $row['id'] . " for collector: " . $row['collector_id'] . "\n";
+while (\$row = \$stmt->fetch(PDO::FETCH_ASSOC)) {
+    \$processed++;
+    echo "Processing log ID: " . \$row['id'] . " for collector: " . \$row['collector_id'] . "\n";
     
-    $result = $parser->parseMessage($row['message'], $row['id'], $row['collector_id'], $row['port']);
+    \$result = \$parser->parseMessage(\$row['message'], \$row['id'], \$row['collector_id'], \$row['port']);
     
-    if ($result) {
-        $successful++;
-        echo "Successfully parsed log ID: " . $row['id'] . "\n";
+    if (\$result) {
+        \$successful++;
+        echo "Successfully parsed log ID: " . \$row['id'] . "\n";
     } else {
-        echo "Failed to parse log ID: " . $row['id'] . "\n";
+        echo "Failed to parse log ID: " . \$row['id'] . "\n";
     }
 }
 
-echo "Parsing completed. Processed: $processed, Successful: $successful\n";
+echo "Parsing completed. Processed: \$processed, Successful: \$successful\n";
 EOF_PHP
         
         # Execute the temporary PHP script with collector ID and last local ID as parameters
