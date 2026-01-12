@@ -150,7 +150,7 @@ EOF_TRANSFER
     INSERT_SCRIPT=$(mktemp)
     
     # Get the data from remote and format as INSERT statements
-    mysql -h $REMOTE_HOST -u $REMOTE_USER -p"$REMOTE_PASS" -N -B $REMOTE_DB -e "SELECT CONCAT('($COLLECTOR_ID,', id, ',', IFNULL(QUOTE(received_at), 'NULL'), ',', IFNULL(QUOTE(hostname), 'NULL'), ',', IFNULL(QUOTE(facility), 'NULL'), ',', IFNULL(QUOTE(message), 'NULL'), ',', IFNULL(port, 'NULL'), '),') FROM $REMOTE_TABLE WHERE id > $LAST_LOCAL_ID ORDER BY id LIMIT $ROWS_TO_FETCH;" > "$INSERT_SCRIPT"
+    mysql -h $REMOTE_HOST -u $REMOTE_USER -p"$REMOTE_PASS" -N -r -B $REMOTE_DB -e "SELECT CONCAT('($COLLECTOR_ID,', id, ',', IFNULL(QUOTE(received_at), 'NULL'), ',', IFNULL(QUOTE(hostname), 'NULL'), ',', IFNULL(QUOTE(facility), 'NULL'), ',', IFNULL(QUOTE(message), 'NULL'), ',', IFNULL(port, 'NULL'), '),') FROM $REMOTE_TABLE WHERE id > $LAST_LOCAL_ID ORDER BY id LIMIT $ROWS_TO_FETCH;" > "$INSERT_SCRIPT"
     
     # Count lines to debug
     ROW_COUNT=$(wc -l < "$INSERT_SCRIPT")
