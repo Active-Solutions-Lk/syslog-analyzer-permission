@@ -7,6 +7,8 @@ mkdir -p logs
 LOG_FILE="logs/dynamic_transfer_$(date +%Y%m%d_%H%M%S).log"
 
 # Redirect all output to the log file
+# Save original stdout to FD 3, then redirect output to log file
+exec 3>&1
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "=========================================="
@@ -380,6 +382,14 @@ if (file_exists('$php_message_parser')) {
 \$lastProcessedId = 0;
 \$startTime = microtime(true);
 
+// Count total rows to process for progress bar
+\$countStmt = \$pdo->prepare("SELECT COUNT(*) FROM log_mirror WHERE collector_id = ? AND original_log_id > ?");
+\$countStmt->execute([\$collectorId, \$lastLocalId]);
+\$totalRows = \$countStmt->fetchColumn();
+
+// Open FD 3 for direct terminal output (bypassing log file)
+\$fd3 = @fopen('php://fd/3', 'w');
+
 while (\$row = \$stmt->fetch(PDO::FETCH_ASSOC)) {
     \$processed++;
     \$lastProcessedId = \$row['id'];
@@ -398,6 +408,16 @@ while (\$row = \$stmt->fetch(PDO::FETCH_ASSOC)) {
     if (\$result) {
         \$successful++;
     }
+
+    // Update progress every 50 rows or on last row to reduce IO overhead
+    if (\$fd3 && (\$processed % 50 == 0 || \$processed == \$totalRows)) {
+        fwrite(\$fd3, "\rProcessing: \$processed / \$totalRows");
+    }
+}
+
+if (\$fd3) {
+    fwrite(\$fd3, "\n"); // Newline after progress bar
+    fclose(\$fd3);
 }
 
 \$endTime = microtime(true);

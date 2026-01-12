@@ -5,7 +5,7 @@ root@analyzer-virtual-machine:/var/www/html/syslog-analyzer-permission# chmod +x
 root@analyzer-virtual-machine:/var/www/html/syslog-analyzer-permission# bash dynamic_incremental_transfer.sh
 ==========================================
 Dynamic Multi-Collector Incremental Sync
-Log File: logs/dynamic_transfer_20260112_152615.log
+Log File: logs/dynamic_transfer_20260112_154851.log
 ==========================================
 ==========================================
 Dynamic Multi-Collector Incremental Sync
@@ -23,7 +23,7 @@ Last fetched ID: 0
 1
 Last fetched ID for collector 4: 0
 Max remote ID: 54751
-New rows available: 54751
+New rows available: 50230
 Fetching first 5000 rows (batch limit)
 
 Starting incremental transfer for collector Collector 1...
@@ -34,20 +34,20 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 ==========================================
 Sync Complete for Collector Collector 1!
 ==========================================
-Duration: 1.230298 seconds
-Rows transferred: 9521
+Duration: 2.304682 seconds
+Rows transferred: 5000
 Previous max ID: 0
 New max ID: 9521
-Transfer rate: 7738.77 rows/second
+Transfer rate: 2169.49 rows/second
 
 ⚠ 45230 rows still remaining on remote server for collector Collector 1
 Run the script again to fetch more data
 
 
 Processing newly transferred logs for parsing...
-Parsing Complete | Processed: 5000 | Successful: 4995 | Last ID: 5000 | Time: 47.6313s
+Parsing Complete | Processed: 5000 | Successful: 4995 | Last ID: 5000 | Time: 43.8955s
 
 ------------------------------------------
-Total Process Duration: 49.3907 seconds
+Total Process Duration: 46.5719 seconds
 ------------------------------------------
 root@analyzer-virtual-machine:/var/www/html/syslog-analyzer-permission#
