@@ -30,7 +30,8 @@ echo "=========================================="
 echo ""
 
 # Fetch active collectors from database
-COLLECTORS_DATA=$(mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -N -e "SELECT id, name, ip, domain, secret_key, last_fetched_id FROM collectors WHERE is_active = 1;")
+# Fetch active collectors from database
+COLLECTORS_DATA=$(mysql -u $LOCAL_USER -p"$LOCAL_PASS" $LOCAL_DB -N -e "SELECT id, name, ip, secret_key, last_fetched_id FROM collectors WHERE is_active = 1;")
 
 # Check if any collectors were found
 if [ -z "$COLLECTORS_DATA" ] || [ $(echo "$COLLECTORS_DATA" | wc -l) -eq 0 ]; then
@@ -42,7 +43,8 @@ echo "Found $(echo "$COLLECTORS_DATA" | wc -l) active collector(s)"
 echo ""
 
 # Process each collector
-while IFS=$'\t' read -r COLLECTOR_ID COLLECTOR_NAME COLLECTOR_IP COLLECTOR_DOMAIN SECRET_KEY LAST_FETCHED_ID; do
+# Process each collector
+while IFS=$'\t' read -r COLLECTOR_ID COLLECTOR_NAME COLLECTOR_IP SECRET_KEY LAST_FETCHED_ID; do
     # Skip empty lines
     if [ -z "$COLLECTOR_ID" ]; then
         continue
@@ -50,17 +52,16 @@ while IFS=$'\t' read -r COLLECTOR_ID COLLECTOR_NAME COLLECTOR_IP COLLECTOR_DOMAI
     
     echo "------------------------------------------"
     echo "Processing Collector: $COLLECTOR_NAME (ID: $COLLECTOR_ID)"
-    echo "IP: $COLLECTOR_IP | Domain: $COLLECTOR_DOMAIN"
+    echo "IP: $COLLECTOR_IP"
     echo "Last fetched ID: $LAST_FETCHED_ID"
     echo "------------------------------------------"
     
     # Use IP if available, otherwise use domain
+    # Use IP if available
     if [ -n "$COLLECTOR_IP" ] && [ "$COLLECTOR_IP" != "NULL" ]; then
         REMOTE_HOST="$COLLECTOR_IP"
-    elif [ -n "$COLLECTOR_DOMAIN" ] && [ "$COLLECTOR_DOMAIN" != "NULL" ]; then
-        REMOTE_HOST="$COLLECTOR_DOMAIN"
     else
-        echo "ERROR: No IP or domain configured for collector $COLLECTOR_NAME"
+        echo "ERROR: No IP configured for collector $COLLECTOR_NAME"
         continue
     fi
     
