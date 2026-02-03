@@ -89,6 +89,12 @@ install_dependencies() {
 create_database_user() {
     print_info "Creating database user and granting privileges..."
     
+    # Try connecting with root password from system (if set)
+    ROOT_PASS=""
+    if [ -f "/root/.my.cnf" ]; then
+        ROOT_PASS=$(grep "password" /root/.my.cnf 2>/dev/null | cut -d'=' -f2 | tr -d " ")
+    fi
+    
     # Create SQL commands file
     cat > /tmp/mariadb_setup.sql << EOF
 -- Create user
@@ -101,8 +107,17 @@ GRANT ALL PRIVILEGES ON ${LOCAL_DB}.* TO '${LOCAL_USER}'@'localhost';
 FLUSH PRIVILEGES;
 EOF
 
-    # Execute SQL commands
-    mysql -u root < /tmp/mariadb_setup.sql
+    # Try different authentication methods
+    if [ ! -z "$ROOT_PASS" ]; then
+        # Try with root password from config file
+        mysql -u root -p"$ROOT_PASS" < /tmp/mariadb_setup.sql
+    else
+        # Try without password first, then prompt if needed
+        mysql -u root < /tmp/mariadb_setup.sql 2>/dev/null || {
+            print_warning "Root authentication required. Please enter root password:"
+            mysql -u root -p < /tmp/mariadb_setup.sql
+        }
+    fi
     
     if [ $? -eq 0 ]; then
         print_success "Database user created and privileges granted"
@@ -117,14 +132,23 @@ EOF
 verify_database_exists() {
     print_info "Verifying database '${LOCAL_DB}' exists..."
     
-    DB_EXISTS=$(mysql -u root -N -e "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='${LOCAL_DB}';" 2>/dev/null)
+    # Try with root password if available
+    if [ ! -z "$ROOT_PASS" ]; then
+        DB_EXISTS=$(mysql -u root -p"$ROOT_PASS" -N -e "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='${LOCAL_DB}';" 2>/dev/null)
+    else
+        DB_EXISTS=$(mysql -u root -N -e "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='${LOCAL_DB}';" 2>/dev/null)
+    fi
     
     if [ -z "$DB_EXISTS" ]; then
         print_error "Database '${LOCAL_DB}' does not exist"
         read -p "$(echo -e ${YELLOW}Do you want to create it? [y/N]: ${NC})" -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            mysql -u root -e "CREATE DATABASE ${LOCAL_DB};"
+            if [ ! -z "$ROOT_PASS" ]; then
+                mysql -u root -p"$ROOT_PASS" -e "CREATE DATABASE ${LOCAL_DB};"
+            else
+                mysql -u root -p -e "CREATE DATABASE ${LOCAL_DB};"
+            fi
             if [ $? -eq 0 ]; then
                 print_success "Database '${LOCAL_DB}' created"
             else
@@ -144,7 +168,11 @@ create_mirror_table() {
     print_info "Creating '${LOCAL_TABLE}' table in '${LOCAL_DB}' database..."
     
     # Check if table already exists
-    TABLE_EXISTS=$(mysql -u root -N -e "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='${LOCAL_DB}' AND TABLE_NAME='${LOCAL_TABLE}';" 2>/dev/null)
+    if [ ! -z "$ROOT_PASS" ]; then
+        TABLE_EXISTS=$(mysql -u root -p"$ROOT_PASS" -N -e "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='${LOCAL_DB}' AND TABLE_NAME='${LOCAL_TABLE}';" 2>/dev/null)
+    else
+        TABLE_EXISTS=$(mysql -u root -N -e "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='${LOCAL_DB}' AND TABLE_NAME='${LOCAL_TABLE}';" 2>/dev/null)
+    fi
     
     if [ ! -z "$TABLE_EXISTS" ]; then
         print_info "Table '${LOCAL_TABLE}' already exists. Skipping creation."
@@ -172,7 +200,11 @@ CREATE TABLE ${LOCAL_TABLE} (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 EOF
 
-    mysql -u root < /tmp/create_table.sql
+    if [ ! -z "$ROOT_PASS" ]; then
+        mysql -u root -p"$ROOT_PASS" < /tmp/create_table.sql
+    else
+        mysql -u root -p < /tmp/create_table.sql
+    fi
     
     if [ $? -eq 0 ]; then
         print_success "Table '${LOCAL_TABLE}' created successfully"
@@ -215,6 +247,7 @@ create_quick_commands() {
 alias sync-now='${SCRIPT_DIR}/${SYNC_SCRIPT}'
 alias sync-logs='mysql -u ${LOCAL_USER} -p"${LOCAL_PASS}" ${LOCAL_DB} -e "SELECT * FROM ${LOCAL_TABLE} ORDER BY id DESC LIMIT 10;"'
 alias sync-status='tail -f ${SCRIPT_DIR}/logs/cron_output.log'
+alias sync-test='mysql -u ${LOCAL_USER} -p"${LOCAL_PASS}" ${LOCAL_DB} -e "SELECT COUNT(*) as total_logs FROM ${LOCAL_TABLE};"'
 EOF
 
     print_success "Quick command aliases added to /root/.bashrc"
