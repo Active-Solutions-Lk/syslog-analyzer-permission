@@ -11,26 +11,26 @@ class DeviceManager
     public function registerDevice($collectorId, $hostname, $port)
     {
         try {
-            // Check if device already exists
-            $checkStmt = $this->pdo->prepare("SELECT id, status FROM devices WHERE collector_id = ? AND port = ?");
-            $checkStmt->execute([$collectorId, $port]);
+            // Check if device already exists with same collector_id, port, and hostname
+            $checkStmt = $this->pdo->prepare("SELECT id, status FROM devices WHERE collector_id = ? AND port = ? AND device_name = ?");
+            $checkStmt->execute([$collectorId, $port, $hostname]);
             $existingDevice = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
             if ($existingDevice) {
-                // Device exists, update device_name and set status to active if needed
-                $updateStmt = $this->pdo->prepare("UPDATE devices SET device_name = ?, status = 1, updated_at = NOW() WHERE id = ?");
-                $updateStmt->execute([$hostname, $existingDevice['id']]);
-                // echo "Updated existing device: $hostname (Port: $port)\n";
+                // Device exists, update status to active if needed
+                $updateStmt = $this->pdo->prepare("UPDATE devices SET status = 1, updated_at = NOW() WHERE id = ?");
+                $updateStmt->execute([$existingDevice['id']]);
+                // echo "Device already exists: $hostname (Port: $port)\n";
                 return $existingDevice['id'];
             } else {
-                // Insert new device
+                // Insert new device - allow multiple devices with same port but different hostnames
                 $insertStmt = $this->pdo->prepare("
                     INSERT INTO devices (collector_id, port, device_name, status, log_quota) 
                     VALUES (?, ?, ?, 1, 100000)
                 ");
                 $insertStmt->execute([$collectorId, $port, $hostname]);
                 $deviceId = $this->pdo->lastInsertId();
-                // echo "Registered new device: $hostname (Port: $port)\n";
+                echo "Registered new device: $hostname (Port: $port)\n";
                 return $deviceId;
             }
 
@@ -45,11 +45,11 @@ class DeviceManager
         try {
             // Get current log count and quota for device
             $stmt = $this->pdo->prepare("
-                SELECT d.log_quota, COUNT(lm.id) as current_logs 
+                SELECT d.log_quota, COUNT(lm.id) as current_logs, d.device_name
                 FROM devices d 
-                LEFT JOIN log_mirror lm ON lm.port = d.port AND lm.collector_id = d.collector_id 
+                LEFT JOIN log_mirror lm ON lm.port = d.port AND lm.collector_id = d.collector_id AND lm.hostname = d.device_name
                 WHERE d.collector_id = ? AND d.port = ?
-                GROUP BY d.id, d.log_quota
+                GROUP BY d.id, d.log_quota, d.device_name
             ");
             $stmt->execute([$collectorId, $port]);
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -57,8 +57,9 @@ class DeviceManager
             if ($result) {
                 $quota = $result['log_quota'];
                 $currentLogs = $result['current_logs'];
+                $deviceName = $result['device_name'];
 
-                echo "Device quota check - Current: $currentLogs, Quota: $quota\n";
+                echo "Device quota check - Device: $deviceName, Port: $port, Current: $currentLogs, Quota: $quota\n";
 
                 if ($currentLogs >= $quota) {
                     echo "Warning: Device has reached log quota limit!\n";
@@ -82,7 +83,7 @@ class DeviceManager
                        COUNT(lm.id) as total_logs,
                        c.name as collector_name
                 FROM devices d
-                LEFT JOIN log_mirror lm ON lm.port = d.port AND lm.collector_id = d.collector_id
+                LEFT JOIN log_mirror lm ON lm.port = d.port AND lm.collector_id = d.collector_id AND lm.hostname = d.device_name
                 LEFT JOIN collectors c ON c.id = d.collector_id
             ";
 

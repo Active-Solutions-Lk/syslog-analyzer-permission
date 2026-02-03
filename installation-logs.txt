@@ -1,53 +1,62 @@
-root@analyzer-virtual-machine:/var/www/html/syslog-analyzer-permission# ls
-'analyzer (4).sql'   connection.php       dynamic_incremental_transfer.sh   installation-logs.txt   message_parser.php              setup-analyzer-permissions.txt
- auto_sync.sh        device_manager.php   incremental_transfer.sh           logs                    setup-analyzer-permissions.sh   system_action_manager.php
-root@analyzer-virtual-machine:/var/www/html/syslog-analyzer-permission# chmod +x dynamic_incremental_transfer.sh
-root@analyzer-virtual-machine:/var/www/html/syslog-analyzer-permission# bash dynamic_incremental_transfer.sh
 ==========================================
-Dynamic Multi-Collector Incremental Sync
-Log File: logs/dynamic_transfer_20260112_154851.log
-==========================================
-==========================================
-Dynamic Multi-Collector Incremental Sync
+ANALYZER SERVER SETUP SCRIPT
 ==========================================
 
-mysql: [Warning] Using a password on the command line interface can be insecure.
-Found 1 active collector(s)
+ℹ This script will configure the Analyzer server environment.
 
-------------------------------------------
-Processing Collector: Collector 1 (ID: 4)
-IP: 192.168.0.91 | Domain: https://192.168.0.91
-Last fetched ID: 0
-------------------------------------------
-1
-1
-Last fetched ID for collector 4: 0
-Max remote ID: 54751
-New rows available: 50230
-Fetching first 5000 rows (batch limit)
+Do you want to continue? [y/N]: y
 
-Starting incremental transfer for collector Collector 1...
-Fetching rows with id > 0 (limit 5000)
+ℹ Checking and installing dependencies...
+122 packages can be upgraded. Run 'apt list --upgradable' to see them.
+ℹ Installing mariadb-client...
+✓ mariadb-client installed successfully
+✓ bc is already installed
+✓ net-tools is already installed
+✓ php-cli is already installed
+✓ php-mysql is already installed
 
-mysql: [Warning] Using a password on the command line interface can be insecure.
-mysql: [Warning] Using a password on the command line interface can be insecure.
+ℹ Creating database user and granting privileges...
+⚠ WARNING: Root authentication required. Please enter root password:
+Enter password:
+✓ Database user created and privileges granted
+
+ℹ Verifying database 'analyzer' exists...
+✗ ERROR: Database 'analyzer' does not exist
+Do you want to create it? [y/N]: y
+Enter password:
+ERROR 1007 (HY000) at line 1: Can't create database 'analyzer'; database exists
+✗ ERROR: Failed to create database
+
+ℹ Creating 'log_mirror' table in 'analyzer' database...
+Enter password:
+ERROR 1050 (42S01) at line 3: Table 'log_mirror' already exists
+✗ ERROR: Failed to create table
+
+ℹ Setting up cron job for dynamic_incremental_transfer.sh...
+✓ Cron job installed to run every minute.
+ℹ Logs will be written to /var/www/html/syslog-analyzer-permission/logs/cron_output.log
+
+ℹ Creating quick command aliases...
+✓ Quick command aliases added to /root/.bashrc
+
 ==========================================
-Sync Complete for Collector Collector 1!
+SETUP COMPLETE - SUMMARY
 ==========================================
-Duration: 2.304682 seconds
-Rows transferred: 5000
-Previous max ID: 0
-New max ID: 9521
-Transfer rate: 2169.49 rows/second
 
-⚠ 45230 rows still remaining on remote server for collector Collector 1
-Run the script again to fetch more data
+Analyzer Server Configuration:
+  Database: analyzer
+  Table: log_mirror
+  User: ruser
 
+Automation:
+  ✓ Dependencies installed (php, mysql-client, bc, net-tools)
+  ✓ Cron job configured (runs every minute)
+  ✓ Script: /var/www/html/syslog-analyzer-permission/dynamic_incremental_transfer.sh
 
-Processing newly transferred logs for parsing...
-Parsing Complete | Processed: 5000 | Successful: 4995 | Last ID: 5000 | Time: 43.8955s
+Quick Commands (reload shell with 'source ~/.bashrc'):
+  \033[0;34msync-now\033[0m      - Manually trigger sync
+  \033[0;34msync-logs\033[0m     - View latest 10 logs from DB
+  \033[0;34msync-status\033[0m   - Tail the cron output log
 
-------------------------------------------
-Total Process Duration: 46.5719 seconds
-------------------------------------------
+✓ Analyzer setup completed successfully!
 root@analyzer-virtual-machine:/var/www/html/syslog-analyzer-permission#
