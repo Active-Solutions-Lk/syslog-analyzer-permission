@@ -396,12 +396,12 @@ while (\$row = \$stmt->fetch(PDO::FETCH_ASSOC)) {
     \$lastProcessedId = \$row['id'];
 
     // Register device if available
-    if ($deviceManager) {
+    if (\$deviceManager) {
         // Use hostname + port as unique key to allow multiple devices on same port
-        $deviceKey = $row['collector_id'] . '_' . $row['hostname'] . '_' . $row['port'];
-        if (!isset($registeredDevices[$deviceKey])) {
-            $deviceManager->registerDevice($row['collector_id'], $row['hostname'], $row['port']);
-            $registeredDevices[$deviceKey] = true;
+        \$deviceKey = \$row['collector_id'] . '_' . \$row['hostname'] . '_' . \$row['port'];
+        if (!isset(\$registeredDevices[\$deviceKey])) {
+            \$deviceManager->registerDevice(\$row['collector_id'], \$row['hostname'], \$row['port']);
+            \$registeredDevices[\$deviceKey] = true;
         }
     }
     
